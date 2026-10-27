@@ -1,6 +1,6 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation {
     private let store = TodoStore()
     private let settings = AppSettings()
     private lazy var list = ListController(store: store)
@@ -15,12 +15,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panelController = PanelController(store: store, list: list, settings: settings)
         panelController.show()
         reminders = ReminderScheduler(store: store, settings: settings)
-        reminders.onOpen = { [weak self] in self?.showPanel() }
+        reminders.onOpen = { [weak self] taskID in self?.showTask(taskID) }
         setUpStatusItem()
     }
 
     // MARK: - Main menu (never visible for a menu-bar app, but it provides the
-    // ⌘Z / ⌘C / ⌘V / ⌘N shortcuts)
+    // ⌘Z / ⌘C / ⌘V / ⌘N / ⌘1…⌘9 shortcuts)
 
     private func setUpMainMenu() {
         let main = NSMenu()
@@ -47,6 +47,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         addSubmenu(editMenu, to: main)
 
+        let workspaceMenu = NSMenu(title: "Workspace")
+        let newWorkspace = item("New Workspace", #selector(newWorkspace))
+        newWorkspace.keyEquivalent = "N"  // ⇧⌘N
+        workspaceMenu.addItem(newWorkspace)
+        for index in 0..<9 {
+            let switchItem = item("Workspace \(index + 1)", #selector(switchWorkspaceByIndex(_:)))
+            switchItem.keyEquivalent = "\(index + 1)"
+            switchItem.tag = index
+            workspaceMenu.addItem(switchItem)
+        }
+        addSubmenu(workspaceMenu, to: main)
+
         NSApp.mainMenu = main
     }
 
@@ -58,6 +70,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func newTask() {
         panelController.focusAddField()
+    }
+
+    @objc private func newWorkspace() {
+        showPanel()
+        list.newWorkspace()
+    }
+
+    @objc private func switchWorkspaceByIndex(_ sender: NSMenuItem) {
+        list.switchWorkspace(at: sender.tag)
+    }
+
+    @objc private func switchWorkspace(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let id = UUID(uuidString: raw) else { return }
+        list.switchWorkspace(to: id)
+    }
+
+    /// From a clicked reminder: open the panel on the task's workspace with the task selected.
+    private func showTask(_ id: UUID?) {
+        showPanel()
+        guard let id, let item = store.item(id) else { return }
+        if let workspaceID = item.workspaceID { list.switchWorkspace(to: workspaceID) }
+        list.selectedID = id
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(switchWorkspaceByIndex(_:)) {
+            return store.workspaces.indices.contains(menuItem.tag)
+        }
+        return true
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -81,6 +122,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(item("Show TodoBar", #selector(showPanel)))
         menu.addItem(item(panelController.isCollapsed ? "Expand" : "Collapse to Side", #selector(toggleCollapsed)))
+        menu.addItem(.separator())
+
+        // Switch workspace without opening the panel.
+        for workspace in store.workspaces {
+            let workspaceItem = item(workspace.name, #selector(switchWorkspace(_:)))
+            workspaceItem.representedObject = workspace.id.uuidString
+            workspaceItem.state = workspace.id == store.currentWorkspaceID ? .on : .off
+            menu.addItem(workspaceItem)
+        }
+        menu.addItem(item("New Workspace…", #selector(newWorkspace)))
         menu.addItem(.separator())
 
         let themeItem = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")

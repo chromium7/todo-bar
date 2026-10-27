@@ -110,6 +110,12 @@ struct CollapsedTab: View {
             Image(systemName: panel.edge == .right ? "chevron.compact.left" : "chevron.compact.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
+            // Which workspace is showing, as its first letter.
+            if store.workspaces.count > 1 {
+                Text(store.currentWorkspace.name.prefix(1).uppercased())
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
             Text("\(store.openCount)")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .monospacedDigit()
@@ -127,9 +133,9 @@ struct CollapsedTab: View {
         .overlay {
             TabHandle(onClick: { panel.expand() }, onDragEnd: { panel.snapTab() })
         }
-        .help(store.overdueCount > 0
-              ? "\(store.overdueCount) overdue · click to expand"
-              : "Click to expand · drag to move")
+        .help("\(store.currentWorkspace.name)"
+              + (store.overdueCount > 0 ? " · \(store.overdueCount) overdue" : "")
+              + " · click to expand, drag to move")
     }
 }
 
@@ -148,7 +154,9 @@ struct ExpandedView: View {
     @State private var newRepeat: RepeatRule?
     @State private var pickingNewDeadline = false
     @State private var draggingID: UUID?
+    @State private var workspaceDraft = ""
     @FocusState private var addFieldFocused: Bool
+    @FocusState private var workspaceFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -170,18 +178,37 @@ struct ExpandedView: View {
     private var header: some View {
         HStack(spacing: 4) {
             HStack(spacing: 6) {
-                Text("Todo")
-                    .font(.system(size: 13, weight: .semibold))
-                if store.openCount > 0 {
-                    Text("\(store.openCount)")
-                        .font(.system(size: 11, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                if list.renamingWorkspaceID == store.currentWorkspaceID {
+                    TextField("Workspace name", text: $workspaceDraft)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(maxWidth: 170)
+                        .focused($workspaceFieldFocused)
+                        .onSubmit(commitWorkspaceName)
+                        .onExitCommand { list.renamingWorkspaceID = nil }
+                } else {
+                    workspaceMenu
+                    if store.openCount > 0 {
+                        Text("\(store.openCount)")
+                            .font(.system(size: 11, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Spacer(minLength: 0)
+                // Empty header space moves the window; double-click collapses.
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay { WindowDragArea(onDoubleClick: { panel.collapse() }) }
             }
             .frame(maxHeight: .infinity)
-            .overlay { WindowDragArea(onDoubleClick: { panel.collapse() }) }
+            .onChange(of: list.renamingWorkspaceID, initial: true) { _, id in
+                guard id != nil else { return }
+                workspaceDraft = store.currentWorkspace.name
+                DispatchQueue.main.async { workspaceFieldFocused = true }
+            }
+            .onChange(of: workspaceFieldFocused) { _, focused in
+                if !focused { commitWorkspaceName() }
+            }
 
             IconButton(systemName: colorScheme == .dark ? "sun.max" : "moon",
                        help: colorScheme == .dark ? "Light theme" : "Dark theme") {
@@ -198,6 +225,45 @@ struct ExpandedView: View {
         .padding(.trailing, 8)
         .padding(.top, 8)
         .padding(.bottom, 2)
+    }
+
+    /// The workspace name doubles as the switcher.
+    private var workspaceMenu: some View {
+        Menu {
+            ForEach(Array(store.workspaces.enumerated()), id: \.element.id) { index, workspace in
+                Toggle(isOn: Binding(
+                    get: { workspace.id == store.currentWorkspaceID },
+                    set: { _ in list.switchWorkspace(to: workspace.id) }
+                )) {
+                    Text(workspace.name)
+                }
+                .keyboardShortcut(index < 9
+                    ? KeyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+                    : nil)
+            }
+            Divider()
+            Button("New Workspace") { list.newWorkspace() }
+            Button("Rename “\(store.currentWorkspace.name)”…") { list.renameCurrentWorkspace() }
+            Button("Delete “\(store.currentWorkspace.name)”…") {
+                // Let the menu close before the confirmation alert opens.
+                let id = store.currentWorkspaceID
+                DispatchQueue.main.async { list.deleteWorkspace(id) }
+            }
+            .disabled(store.workspaces.count < 2)
+        } label: {
+            Text(store.currentWorkspace.name)
+                .font(.system(size: 13, weight: .semibold))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.visible)
+        .fixedSize()
+        .help("Switch workspace (⌘1–⌘9)")
+    }
+
+    private func commitWorkspaceName() {
+        guard let id = list.renamingWorkspaceID else { return }
+        store.renameWorkspace(id, to: workspaceDraft)
+        list.renamingWorkspaceID = nil
     }
 
     private var optionsMenu: some View {
@@ -477,6 +543,18 @@ struct TaskRow: View {
             Button(item.deadline == nil ? "Add Deadline…" : "Change Deadline…") { editingDeadline = true }
             if item.deadline != nil {
                 Button("Remove Deadline") { store.setDeadline(item.id, nil, hasTime: false, repeatRule: nil) }
+            }
+            if store.workspaces.count > 1 {
+                Menu("Move to") {
+                    ForEach(store.workspaces.filter { $0.id != item.workspaceID }) { workspace in
+                        Button(workspace.name) {
+                            if list.selectedID == item.id { list.selectedID = nil }
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                store.moveTask(item.id, toWorkspace: workspace.id)
+                            }
+                        }
+                    }
+                }
             }
             Divider()
             Button("Delete") { list.delete(item.id) }

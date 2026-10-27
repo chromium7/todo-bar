@@ -33,6 +33,8 @@ final class ListController: ObservableObject {
     @Published var selectedID: UUID?
     @Published var editingID: UUID?
     @Published var expandedNotes: Set<UUID> = []
+    /// The workspace whose name is being edited in the header, if any.
+    @Published var renamingWorkspaceID: UUID?
     /// Bumped to ask the view to focus "Add a task…".
     @Published private(set) var addFocusRequest = 0
     /// Just-completed tasks stay in place briefly so the strikethrough can play before they move to Done.
@@ -137,6 +139,50 @@ final class ListController: ObservableObject {
     func clearSelection() {
         selectedID = nil
         editingID = nil
+    }
+
+    // MARK: - Workspaces
+
+    func switchWorkspace(to id: UUID) {
+        guard id != store.currentWorkspaceID else { return }
+        clearSelection()
+        renamingWorkspaceID = nil
+        withAnimation(.easeOut(duration: 0.15)) { store.switchWorkspace(to: id) }
+    }
+
+    /// ⌘1…⌘9.
+    func switchWorkspace(at index: Int) {
+        guard store.workspaces.indices.contains(index) else { return }
+        switchWorkspace(to: store.workspaces[index].id)
+    }
+
+    /// Creates a workspace, switches to it and starts editing its name.
+    func newWorkspace() {
+        clearSelection()
+        let id = withAnimation(.easeOut(duration: 0.15)) { store.addWorkspace(named: "New Workspace") }
+        renamingWorkspaceID = id
+    }
+
+    func renameCurrentWorkspace() {
+        renamingWorkspaceID = store.currentWorkspaceID
+    }
+
+    /// Asks first if the workspace still has tasks (it's undoable, but easy to do by accident).
+    func deleteWorkspace(_ id: UUID) {
+        guard store.workspaces.count > 1, let workspace = store.workspaces.first(where: { $0.id == id }) else { return }
+        let count = store.taskCount(in: id)
+        if count > 0 {
+            let alert = NSAlert()
+            alert.messageText = "Delete “\(workspace.name)”?"
+            alert.informativeText = "Its \(count) task\(count == 1 ? "" : "s") will be deleted too. You can undo this with ⌘Z."
+            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate()
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        clearSelection()
+        renamingWorkspaceID = nil
+        withAnimation(.easeOut(duration: 0.15)) { store.deleteWorkspace(id) }
     }
 
     /// ↑/↓: move the selection. Going up past the first task returns to "Add a task…".

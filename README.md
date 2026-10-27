@@ -19,6 +19,11 @@ menu bar icon, or System Settings → General → Login Items).
   The panel slides into a slim tab on the nearest screen edge showing the number of
   open tasks (a red dot means something is overdue). Click the tab to expand; drag it
   to move it (it snaps to the nearest left/right edge).
+- **Workspaces** (e.g. Office / Personal): the title in the header is the current
+  workspace — click it to switch, create, rename or delete. ⌘1…⌘9 switch directly,
+  ⇧⌘N makes a new one, and the menu bar ✓ icon switches without opening the panel.
+  New tasks go into the workspace you're in; right-click a task → Move to… to move it.
+  The collapsed tab shows the workspace's first letter. Reminders fire for all workspaces.
 - **Add**: type in "Add a task…" and press Return (⌘N jumps there). The calendar icon
   next to it sets a deadline for the new task.
 - **Deadline**: hover a task → calendar icon, or click its deadline to change it.
