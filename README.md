@@ -17,7 +17,7 @@ menu bar icon, or System Settings → General → Login Items).
 - **Move**: drag the header. **Resize**: drag the grip in the bottom-right corner.
 - **Collapse to side**: press Esc, click the collapse button in the header, or double-click the header.
   The panel slides into a slim tab on the nearest screen edge showing the number of
-  open tasks (a red dot means something is overdue). Click the tab to expand; drag it
+  open tasks (and a red badge with the overdue count). Click the tab to expand; drag it
   to move it (it snaps to the nearest left/right edge).
 - **Workspaces** (e.g. Office / Personal): the title in the header is the current
   workspace — click it to switch, create, rename or delete. ⌘1…⌘9 switch directly,
@@ -39,9 +39,7 @@ menu bar icon, or System Settings → General → Login Items).
 - **Edit / notes**: double-click a task to edit its title and add a note (links in notes
   are clickable; ⌥↩ for a new line). Right-click for more.
 - **Undo**: ⌘Z / ⇧⌘Z undo and redo deletes, completes, edits, reorders and "Clear done".
-- **Keyboard** (click a task to select it):
-  ↑/↓ select · Space complete · ⌫ delete · Return edit · ⌘↑/⌘↓ move · Esc collapse.
-  ↓ from "Add a task…" jumps into the list, ↑ from the first task jumps back.
+- **Keyboard**: see [Keyboard shortcuts](#keyboard-shortcuts) below.
 - **Fade when idle**: the panel goes semi-transparent when the mouse isn't over it
   (and you're not typing). Turn off in `…` → Fade When Idle.
 - **Theme**: sun/moon button switches light/dark; `…` → Theme also offers System.
@@ -51,4 +49,51 @@ menu bar icon, or System Settings → General → Login Items).
   (clearer blur, top highlight, bright rim). Rebuild after updating the tools to switch.
 - There's no Dock icon; the menu bar ✓ icon can show, collapse, or quit the app.
 
-Tasks are stored in `~/Library/Application Support/TodoBar/tasks.json`.
+## Keyboard shortcuts
+
+Shortcuts work while the TodoBar panel is focused (the last thing you clicked).
+
+**General**
+
+| Shortcut | Action |
+| --- | --- |
+| `Esc` | Collapse the panel to the side |
+| `⌘N` | New task (expands the panel and focuses "Add a task…") |
+| `⌘Z` | Undo |
+| `⇧⌘Z` | Redo |
+| `⌘Q` | Quit TodoBar |
+
+**Workspaces**
+
+| Shortcut | Action |
+| --- | --- |
+| `⌘1` … `⌘9` | Switch to workspace 1–9 (in menu order) |
+| `⇧⌘N` | New workspace |
+
+**Task list** (click a task to select it)
+
+| Shortcut | Action |
+| --- | --- |
+| `↑` / `↓` | Select the previous / next task |
+| `↑` on the first task | Back to "Add a task…" |
+| `Space` | Mark the selected task done / not done |
+| `Return` | Edit the selected task's title and note |
+| `⌫` or `⌦` | Delete the selected task |
+| `⌘↑` / `⌘↓` | Move the selected task up / down (manual sort only) |
+
+**Adding and editing**
+
+| Shortcut | Action |
+| --- | --- |
+| `Return` in "Add a task…" | Add the task |
+| `↓` in "Add a task…" | Jump into the task list |
+| `Esc` in "Add a task…" | Collapse the panel |
+| `Return` while editing | Save the title and note |
+| `⌥Return` in a note | New line |
+| `Esc` while editing | Cancel the edit (also cancels a workspace rename) |
+| `⌘C` / `⌘V` / `⌘X` / `⌘A` | Copy / paste / cut / select all in text fields |
+
+## Data
+
+Tasks are stored in `~/Library/Application Support/TodoBar/tasks.json`, workspaces in
+`workspaces.json` next to it.
