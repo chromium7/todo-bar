@@ -422,8 +422,9 @@ struct ExpandedView: View {
     }
 
     private func addTask() {
-        guard !newTitle.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         withAnimation(.easeOut(duration: 0.18)) {
+            list.sortMode = .deadline
             store.add(title: newTitle, deadline: newDeadline, hasTime: newDeadlineHasTime, repeatRule: newRepeat)
         }
         newTitle = ""

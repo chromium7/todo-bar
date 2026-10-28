@@ -25,7 +25,8 @@ menu bar icon, or System Settings → General → Login Items).
   New tasks go into the workspace you're in; right-click a task → Move to… to move it.
   The collapsed tab shows the workspace's first letter. Reminders fire for all workspaces.
 - **Add**: type in "Add a task…" and press Return (⌘N jumps there). The calendar icon
-  next to it sets a deadline for the new task.
+  next to it sets a deadline for the new task. Adding a task automatically switches
+  to By Deadline sorting: soonest first, with tasks without a deadline last.
 - **Deadline**: hover a task → calendar icon, or click its deadline to change it.
   Overdue deadlines show in red, today's in orange. The collapsed tab shows a red
   badge with the number of overdue tasks.
