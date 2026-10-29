@@ -111,6 +111,7 @@ final class PanelController: NSObject, ObservableObject, NSWindowDelegate {
         restoreState()
 
         settings.$windowStyle
+            .combineLatest(settings.$theme)
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -255,6 +256,7 @@ final class PanelController: NSObject, ObservableObject, NSWindowDelegate {
         if settings.windowStyle == .glass, #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
             glass.style = .regular
+            glass.tintColor = settings.theme.wash?.withAlphaComponent(0.6)
             glass.contentView = hostingView
             panel.contentView = glass
             usesNativeGlass = true

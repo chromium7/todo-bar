@@ -18,17 +18,26 @@ struct RootView: View {
             }
         }
         .background {
-            if settings.windowStyle == .glass && !panel.usesNativeGlass {
-                GlassSheen(shape: shape)
+            ZStack {
+                // Real Liquid Glass is tinted natively (see PanelController).
+                if let wash = settings.theme.wash, !panel.usesNativeGlass {
+                    shape.fill(Color(nsColor: wash).opacity(0.6))
+                }
+                if settings.windowStyle == .glass && !panel.usesNativeGlass {
+                    GlassSheen(shape: shape)
+                }
             }
+            .allowsHitTesting(false)
         }
+        .tint(settings.theme.accent.map { Color(nsColor: $0) })
         .overlay {
             // Real Liquid Glass draws its own edge.
             if !panel.usesNativeGlass {
                 if settings.windowStyle == .glass {
                     GlassEdge(shape: shape)
                 } else {
-                    shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                    shape.strokeBorder(settings.theme.accent.map { Color(nsColor: $0).opacity(0.3) }
+                                       ?? Color.primary.opacity(0.1), lineWidth: 1)
                         .allowsHitTesting(false)
                 }
             }
@@ -526,7 +535,8 @@ struct TaskRow: View {
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(hovering ? 0.05 : 0))
+                .fill(isSelected ? AnyShapeStyle(.tint.opacity(0.16))
+                                 : AnyShapeStyle(Color.primary.opacity(hovering ? 0.05 : 0)))
         )
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { list.beginEditing(item.id) }
@@ -674,9 +684,10 @@ struct CheckButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .strokeBorder(isOn ? Color.accentColor : Color.secondary.opacity(0.7), lineWidth: 1.3)
+                    .strokeBorder(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.secondary.opacity(0.7)),
+                                  lineWidth: 1.3)
                 Circle()
-                    .fill(Color.accentColor)
+                    .fill(.tint)
                     .scaleEffect(isOn ? 1 : 0.3)
                     .opacity(isOn ? 1 : 0)
                 Image(systemName: "checkmark")

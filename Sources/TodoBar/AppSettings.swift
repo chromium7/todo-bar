@@ -2,7 +2,7 @@ import AppKit
 import ServiceManagement
 
 enum Theme: String, CaseIterable, Identifiable {
-    case system, light, dark
+    case system, light, dark, pink
 
     var id: String { rawValue }
 
@@ -11,6 +11,7 @@ enum Theme: String, CaseIterable, Identifiable {
         case .system: "System"
         case .light: "Light"
         case .dark: "Dark"
+        case .pink: "Soft Pink"
         }
     }
 }
@@ -25,6 +26,18 @@ enum WindowStyle: String, CaseIterable, Identifiable {
         case .standard: "Standard"
         case .glass: "Liquid Glass"
         }
+    }
+}
+
+extension Theme {
+    /// Checkboxes, selection and controls. nil means the system accent colour.
+    var accent: NSColor? {
+        self == .pink ? NSColor(srgbRed: 0.89, green: 0.44, blue: 0.59, alpha: 1) : nil
+    }
+
+    /// Laid over the window background. nil means no tint.
+    var wash: NSColor? {
+        self == .pink ? NSColor(srgbRed: 1.0, green: 0.84, blue: 0.89, alpha: 1) : nil
     }
 }
 
@@ -60,6 +73,7 @@ final class AppSettings: ObservableObject {
         case .system: nil
         case .light: NSAppearance(named: .aqua)
         case .dark: NSAppearance(named: .darkAqua)
+        case .pink: NSAppearance(named: .aqua)
         }
     }
 

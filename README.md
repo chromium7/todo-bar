@@ -43,7 +43,8 @@ menu bar icon, or System Settings → General → Login Items).
 - **Keyboard**: see [Keyboard shortcuts](#keyboard-shortcuts) below.
 - **Fade when idle**: the panel goes semi-transparent when the mouse isn't over it
   (and you're not typing). Turn off in `…` → Fade When Idle.
-- **Theme**: sun/moon button switches light/dark; `…` → Theme also offers System.
+- **Theme**: sun/moon button switches light/dark; `…` → Theme also offers System and
+  Soft Pink (a light theme with a pink wash and rose accents, in either style).
 - **Style**: `…` → Style → Liquid Glass (default) or Standard; both work in light and dark.
   Built with the macOS 26 SDK (Command Line Tools / Xcode 26+), this uses Apple's real
   Liquid Glass (`NSGlassEffectView`). With an older SDK it falls back to an imitation
