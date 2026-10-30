@@ -31,9 +31,16 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
+/// Pages that slide in over the task list.
+enum PanelPage {
+    case settings, workspaces
+}
+
 final class PanelController: NSObject, ObservableObject, NSWindowDelegate {
     @Published private(set) var isCollapsed = false
     @Published private(set) var edge: DockEdge = .right
+    /// A page showing in place of the task list, if any.
+    @Published private(set) var page: PanelPage?
 
     static let tabSize = NSSize(width: 30, height: 96)
     static let minSize = NSSize(width: 250, height: 200)
@@ -84,14 +91,14 @@ final class PanelController: NSObject, ObservableObject, NSWindowDelegate {
         panel.hasShadow = true
         panel.minSize = Self.minSize
         panel.delegate = self
-        panel.onEscape = { [weak self] in self?.collapse() }
+        panel.onEscape = { [weak self] in self?.escape() }
         panel.keyHandler = { [weak self] event in
             guard let self else { return false }
             if event.keyCode == 53 { // esc
-                self.collapse()
+                self.escape()
                 return true
             }
-            return !self.isCollapsed && list.handleKey(event)
+            return !self.isCollapsed && self.page == nil && list.handleKey(event)
         }
 
         effectView.blendingMode = .behindWindow
@@ -184,7 +191,27 @@ final class PanelController: NSObject, ObservableObject, NSWindowDelegate {
         updateFade()
     }
 
+    func open(_ page: PanelPage) {
+        show()
+        expand()
+        panel.makeKey()
+        panel.makeFirstResponder(nil)
+        list.clearSelection()
+        withAnimation(.easeInOut(duration: 0.22)) { self.page = page }
+    }
+
+    /// Back to the task list.
+    func closePage() {
+        withAnimation(.easeInOut(duration: 0.22)) { page = nil }
+    }
+
+    /// Esc backs out of a page first, then collapses the panel.
+    private func escape() {
+        page != nil ? closePage() : collapse()
+    }
+
     func focusAddField() {
+        page = nil
         show()
         expand()
         panel.makeKey()

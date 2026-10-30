@@ -114,10 +114,6 @@ final class TodoStore: ObservableObject {
     var doneCount: Int { items.count - openCount }
     var overdueCount: Int { items.filter { $0.isOverdue() }.count }
 
-    func taskCount(in workspaceID: UUID) -> Int {
-        allItems.filter { $0.workspaceID == workspaceID }.count
-    }
-
     func item(_ id: UUID) -> TodoItem? {
         allItems.first { $0.id == id }
     }

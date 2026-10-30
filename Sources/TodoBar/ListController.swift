@@ -33,7 +33,7 @@ final class ListController: ObservableObject {
     @Published var selectedID: UUID?
     @Published var editingID: UUID?
     @Published var expandedNotes: Set<UUID> = []
-    /// The workspace whose name is being edited in the header, if any.
+    /// The workspace whose name is being edited on the workspaces page, if any.
     @Published var renamingWorkspaceID: UUID?
     /// Bumped to ask the view to focus "Add a task…".
     @Published private(set) var addFocusRequest = 0
@@ -163,23 +163,9 @@ final class ListController: ObservableObject {
         renamingWorkspaceID = id
     }
 
-    func renameCurrentWorkspace() {
-        renamingWorkspaceID = store.currentWorkspaceID
-    }
-
-    /// Asks first if the workspace still has tasks (it's undoable, but easy to do by accident).
+    /// Deletes the workspace and its tasks (undoable). The workspaces page asks first when it has tasks.
     func deleteWorkspace(_ id: UUID) {
-        guard store.workspaces.count > 1, let workspace = store.workspaces.first(where: { $0.id == id }) else { return }
-        let count = store.taskCount(in: id)
-        if count > 0 {
-            let alert = NSAlert()
-            alert.messageText = "Delete “\(workspace.name)”?"
-            alert.informativeText = "Its \(count) task\(count == 1 ? "" : "s") will be deleted too. You can undo this with ⌘Z."
-            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
-            alert.addButton(withTitle: "Cancel")
-            NSApp.activate()
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
+        guard store.workspaces.count > 1 else { return }
         clearSelection()
         renamingWorkspaceID = nil
         withAnimation(.easeOut(duration: 0.15)) { store.deleteWorkspace(id) }

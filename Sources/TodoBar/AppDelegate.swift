@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     func applicationDidFinishLaunching(_ notification: Notification) {
         settings.applyTheme()
         settings.enableLaunchAtLoginOnFirstRun()
+        settings.startRotation()
         setUpMainMenu()
         panelController = PanelController(store: store, list: list, settings: settings)
         panelController.show()
@@ -26,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let main = NSMenu()
 
         let appMenu = NSMenu()
+        let settingsItem = item("Settings…", #selector(openSettings))
+        settingsItem.keyEquivalent = ","
+        appMenu.addItem(settingsItem)
         appMenu.addItem(NSMenuItem(title: "Quit TodoBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         addSubmenu(appMenu, to: main)
 
@@ -73,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     @objc private func newWorkspace() {
-        showPanel()
+        panelController.open(.workspaces)
         list.newWorkspace()
     }
 
@@ -132,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             menu.addItem(workspaceItem)
         }
         menu.addItem(item("New Workspace…", #selector(newWorkspace)))
+        menu.addItem(item("Manage Workspaces…", #selector(openWorkspaces)))
         menu.addItem(.separator())
 
         let themeItem = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
@@ -144,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         }
         themeItem.submenu = themeMenu
         menu.addItem(themeItem)
+
+        menu.addItem(item("Settings…", #selector(openSettings)))
 
         let login = item("Launch at Login", #selector(toggleLaunchAtLogin))
         login.state = settings.launchAtLogin ? .on : .off
@@ -161,6 +168,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     @objc private func showPanel() {
         panelController.show()
         panelController.expand()
+    }
+
+    @objc private func openWorkspaces() {
+        panelController.open(.workspaces)
+    }
+
+    @objc private func openSettings() {
+        panelController.open(.settings)
     }
 
     @objc private func toggleCollapsed() {

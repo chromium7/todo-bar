@@ -11,32 +11,55 @@ struct RootView: View {
             } else {
                 // Keep a minimum layout size while the window animates open, so the
                 // content slides out like a drawer instead of squashing.
-                ExpandedView()
-                    .frame(minWidth: PanelController.minSize.width, minHeight: PanelController.minSize.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: panel.edge == .right ? .topLeading : .topTrailing)
+                ZStack {
+                    // The list stays alive under a page so drafts and scroll position survive.
+                    ExpandedView()
+                        .opacity(panel.page == nil ? 1 : 0)
+                        .allowsHitTesting(panel.page == nil)
+                    switch panel.page {
+                    case .settings:
+                        SettingsView()
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    case .workspaces:
+                        WorkspacesView()
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    case nil:
+                        EmptyView()
+                    }
+                }
+                .clipped()
+                .frame(minWidth: PanelController.minSize.width, minHeight: PanelController.minSize.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: panel.edge == .right ? .topLeading : .topTrailing)
             }
         }
         .background {
             ZStack {
-                // Real Liquid Glass is tinted natively (see PanelController).
-                if let wash = settings.theme.wash, !panel.usesNativeGlass {
-                    shape.fill(Color(nsColor: wash).opacity(0.6))
-                }
-                if settings.windowStyle == .glass && !panel.usesNativeGlass {
-                    GlassSheen(shape: shape)
+                // The wallpaper styles are opaque, with their own colours for each theme.
+                if settings.windowStyle == .doodle {
+                    DoodleBackground(shape: shape, theme: settings.theme)
+                } else if let pack = settings.windowStyle.stickerPack {
+                    StickerBackground(pack: pack, shape: shape, theme: settings.theme)
+                } else {
+                    // Real Liquid Glass is tinted natively (see PanelController).
+                    if let wash = settings.theme.wash, !panel.usesNativeGlass {
+                        shape.fill(Color(nsColor: wash).opacity(0.6))
+                    }
+                    if settings.windowStyle == .glass && !panel.usesNativeGlass {
+                        GlassSheen(shape: shape)
+                    }
                 }
             }
             .allowsHitTesting(false)
         }
-        .tint(settings.theme.accent.map { Color(nsColor: $0) })
+        .tint(settings.accent.map { Color(nsColor: $0) })
         .overlay {
             // Real Liquid Glass draws its own edge.
             if !panel.usesNativeGlass {
                 if settings.windowStyle == .glass {
                     GlassEdge(shape: shape)
                 } else {
-                    shape.strokeBorder(settings.theme.accent.map { Color(nsColor: $0).opacity(0.3) }
+                    shape.strokeBorder(settings.accent.map { Color(nsColor: $0).opacity(0.3) }
                                        ?? Color.primary.opacity(0.1), lineWidth: 1)
                         .allowsHitTesting(false)
                 }
@@ -163,9 +186,7 @@ struct ExpandedView: View {
     @State private var newRepeat: RepeatRule?
     @State private var pickingNewDeadline = false
     @State private var draggingID: UUID?
-    @State private var workspaceDraft = ""
     @FocusState private var addFieldFocused: Bool
-    @FocusState private var workspaceFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -187,22 +208,12 @@ struct ExpandedView: View {
     private var header: some View {
         HStack(spacing: 4) {
             HStack(spacing: 6) {
-                if list.renamingWorkspaceID == store.currentWorkspaceID {
-                    TextField("Workspace name", text: $workspaceDraft)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(maxWidth: 170)
-                        .focused($workspaceFieldFocused)
-                        .onSubmit(commitWorkspaceName)
-                        .onExitCommand { list.renamingWorkspaceID = nil }
-                } else {
-                    workspaceMenu
-                    if store.openCount > 0 {
-                        Text("\(store.openCount)")
-                            .font(.system(size: 11, weight: .medium))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
+                workspaceButton
+                if store.openCount > 0 {
+                    Text("\(store.openCount)")
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
                 // Empty header space moves the window; double-click collapses.
                 Color.clear
@@ -210,20 +221,14 @@ struct ExpandedView: View {
                     .overlay { WindowDragArea(onDoubleClick: { panel.collapse() }) }
             }
             .frame(maxHeight: .infinity)
-            .onChange(of: list.renamingWorkspaceID, initial: true) { _, id in
-                guard id != nil else { return }
-                workspaceDraft = store.currentWorkspace.name
-                DispatchQueue.main.async { workspaceFieldFocused = true }
-            }
-            .onChange(of: workspaceFieldFocused) { _, focused in
-                if !focused { commitWorkspaceName() }
-            }
 
             IconButton(systemName: colorScheme == .dark ? "sun.max" : "moon",
                        help: colorScheme == .dark ? "Light theme" : "Dark theme") {
                 settings.toggleLightDark()
             }
-            optionsMenu
+            IconButton(systemName: "gearshape", help: "Settings (⌘,)") {
+                panel.open(.settings)
+            }
             IconButton(systemName: "arrow.down.right.and.arrow.up.left",
                        help: "Collapse to side (Esc)", size: 26, fontSize: 14) {
                 panel.collapse()
@@ -236,80 +241,23 @@ struct ExpandedView: View {
         .padding(.bottom, 2)
     }
 
-    /// The workspace name doubles as the switcher.
-    private var workspaceMenu: some View {
-        Menu {
-            ForEach(Array(store.workspaces.enumerated()), id: \.element.id) { index, workspace in
-                Toggle(isOn: Binding(
-                    get: { workspace.id == store.currentWorkspaceID },
-                    set: { _ in list.switchWorkspace(to: workspace.id) }
-                )) {
-                    Text(workspace.name)
-                }
-                .keyboardShortcut(index < 9
-                    ? KeyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
-                    : nil)
-            }
-            Divider()
-            Button("New Workspace") { list.newWorkspace() }
-            Button("Rename “\(store.currentWorkspace.name)”…") { list.renameCurrentWorkspace() }
-            Button("Delete “\(store.currentWorkspace.name)”…") {
-                // Let the menu close before the confirmation alert opens.
-                let id = store.currentWorkspaceID
-                DispatchQueue.main.async { list.deleteWorkspace(id) }
-            }
-            .disabled(store.workspaces.count < 2)
+    /// The workspace name opens the workspaces page.
+    private var workspaceButton: some View {
+        Button {
+            panel.open(.workspaces)
         } label: {
-            Text(store.currentWorkspace.name)
-                .font(.system(size: 13, weight: .semibold))
+            HStack(spacing: 4) {
+                Text(store.currentWorkspace.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.visible)
-        .fixedSize()
-        .help("Switch workspace (⌘1–⌘9)")
-    }
-
-    private func commitWorkspaceName() {
-        guard let id = list.renamingWorkspaceID else { return }
-        store.renameWorkspace(id, to: workspaceDraft)
-        list.renamingWorkspaceID = nil
-    }
-
-    private var optionsMenu: some View {
-        Menu {
-            Picker("Sort", selection: $list.sortMode) {
-                ForEach(SortMode.allCases) { Text($0.title).tag($0) }
-            }
-            Picker("Theme", selection: $settings.theme) {
-                ForEach(Theme.allCases) { Text($0.title).tag($0) }
-            }
-            Picker("Style", selection: $settings.windowStyle) {
-                ForEach(WindowStyle.allCases) { Text($0.title).tag($0) }
-            }
-            Divider()
-            Toggle("Deadline Reminders", isOn: $settings.remindersEnabled)
-            Toggle("Fade When Idle", isOn: $settings.fadeWhenIdle)
-            Toggle("Launch at Login", isOn: Binding(
-                get: { settings.launchAtLogin },
-                set: { settings.setLaunchAtLogin($0) }
-            ))
-            Divider()
-            Button("Clear Completed") {
-                withAnimation(.easeOut(duration: 0.18)) { store.clearCompleted() }
-            }
-            .disabled(store.doneCount == 0)
-            Divider()
-            Button("Quit TodoBar") { NSApp.terminate(nil) }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 11, weight: .medium))
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .frame(width: 24, height: 22)
-        .help("Options")
-        .onAppear { settings.refreshLaunchAtLogin() }
+        .buttonStyle(.plain)
+        .help("Workspaces (⌘1–⌘9 to switch)")
     }
 
     private var addField: some View {
