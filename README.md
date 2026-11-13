@@ -7,7 +7,41 @@ A tiny always-on-top todo list for macOS (14+). SwiftUI + AppKit, no dependencie
 ```sh
 ./build.sh            # builds build/TodoBar.app
 ./build.sh --install  # also copies it to ~/Applications and launches it
+./build.sh --dist     # universal zip for other Macs (see below)
 ```
+
+### Download (no Xcode needed)
+
+Get **[TodoBar.zip](https://github.com/chromium7/todo-bar/releases/latest/download/TodoBar.zip)**
+from the [latest release](https://github.com/chromium7/todo-bar/releases/latest) (macOS 14+,
+Apple Silicon or Intel), unzip it and drag `TodoBar.app` into Applications.
+`./build.sh --dist` makes the same zip locally in `build/TodoBar.zip`.
+
+The app isn't signed with an Apple Developer ID, so the first time macOS blocks it. Either:
+
+- double-click it, then open System Settings → Privacy & Security, scroll down
+  and click **Open Anyway** next to TodoBar, or
+- run `xattr -dr com.apple.quarantine /Applications/TodoBar.app` once in Terminal.
+
+After that it opens normally.
+
+### Releasing
+
+Versions follow [semver](https://semver.org) and live in `Resources/Info.plist`
+(`CFBundleShortVersionString`). To publish a release, run the **Release** workflow from
+the Actions tab, or:
+
+```sh
+gh workflow run release.yml                  # patch: 1.2.3 → 1.2.4 (fixes)
+gh workflow run release.yml -f bump=minor    # minor: 1.2.3 → 1.3.0 (new features)
+gh workflow run release.yml -f bump=major    # major: 1.2.3 → 2.0.0 (breaking changes)
+gh workflow run release.yml -f version=1.0.0 # an exact version
+```
+
+It bumps the version (and the build number), builds the universal app on a macOS runner,
+pushes a `Release vX.Y.Z` commit and a `vX.Y.Z` tag to master, and publishes a GitHub
+release with `TodoBar.zip` and the commits since the previous release. Run `git pull`
+afterwards to get the version bump locally.
 
 On first launch it registers itself as a login item (toggle in Settings, the
 menu bar icon, or System Settings → General → Login Items).

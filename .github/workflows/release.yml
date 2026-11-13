@@ -1,0 +1,102 @@
+name: Release
+
+# Run from the Actions tab (Release → Run workflow) or:
+#   gh workflow run release.yml -f bump=minor
+# Bumps the semantic version in Resources/Info.plist, builds a universal app,
+# commits the bump, tags vX.Y.Z and publishes a GitHub release with TodoBar.zip.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to increase
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: Exact version instead (e.g. 2.0.0); leave empty to use the bump
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Work out the new version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXACT: ${{ inputs.version }}
+        run: |
+          PLIST=Resources/Info.plist
+          CURRENT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+          if [[ -n "$EXACT" ]]; then
+            VERSION="${EXACT#v}"
+          else
+            IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+            VERSION="$MAJOR.$MINOR.$PATCH"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a semantic version (X.Y.Z)"; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::Tag v$VERSION already exists"; exit 1
+          fi
+          BUILD=$(( $(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST") + 1 ))
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"
+          echo "Releasing $CURRENT → $VERSION (build $BUILD)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          swift --version
+          ./build.sh --dist
+
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release v$VERSION"
+          git tag "v$VERSION"
+          git push --atomic origin "HEAD:refs/heads/${{ github.event.repository.default_branch }}" "refs/tags/v$VERSION"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || true)
+          {
+            echo "## Install"
+            echo
+            echo "Download **TodoBar.zip** below, unzip it and drag \`TodoBar.app\` into Applications (macOS 14+, Apple Silicon or Intel)."
+            echo
+            echo "The app isn't notarized, so the first launch is blocked: open System Settings → Privacy & Security and click **Open Anyway**, or run"
+            echo "\`xattr -dr com.apple.quarantine /Applications/TodoBar.app\` once in Terminal."
+            echo
+            echo "## Changes"
+            echo
+            git log --no-merges --pretty='- %s' ${PREV:+"$PREV..v$VERSION^"} | grep -v '^- Release v' || echo "- First release"
+          } > notes.md
+          gh release create "v$VERSION" build/TodoBar.zip \
+            --title "TodoBar $VERSION" --notes-file notes.md
